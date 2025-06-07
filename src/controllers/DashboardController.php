@@ -34,54 +34,115 @@ class DashboardController {
             $matieres = $stmt->fetchAll();
             require 'views/dashboard/enseignant.php';
         } elseif ($role == 'admin') {
+            // Récupérer les matières
             $matieres = $this->matiereModel->getAllMatieres();
+            
+            // Récupérer la liste des étudiants
+            $etudiants = $this->getEtudiants();
+            
+            // Récupérer la liste des enseignants
+            $enseignants = $this->getEnseignants();
 
-            if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajouter_matiere'])) {
-                $nom_matiere = $_POST['nom_matiere'];
-                $description = $_POST['description'];
-                $this->matiereModel->addMatiere($nom_matiere, $description);
-                header("Location: dashboard.php");
-                exit();
-            }
-
-            if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['supprimer_matiere'])) {
-                $matiere_id = $_POST['matiere_id'];
-                $this->matiereModel->deleteMatiere($matiere_id);
-                header("Location: dashboard.php");
-                exit();
-            }
-
-            if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajouter_etudiant'])) {
-                $nom = $_POST['nom_etudiant'];
-                $prenom = $_POST['prenom_etudiant'];
-                $tel = $_POST['tel_etudiant'];
-                $email = $_POST['email_etudiant'];
-                $mot_de_passe = $_POST['mot_de_passe_etudiant'];
-                $anneeEntree = $_POST['annee_entree'];
-                $this->utilisateurModel->addEtudiant($nom, $prenom, $tel, $email, $mot_de_passe, $anneeEntree);
-                header("Location: dashboard.php");
-                exit();
-            }
-
-            if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajouter_enseignant'])) {
-                $nom = $_POST['nom_enseignant'];
-                $prenom = $_POST['prenom_enseignant'];
-                $tel = $_POST['tel_enseignant'];
-                $email = $_POST['email_enseignant'];
-                $mot_de_passe = $_POST['mot_de_passe_enseignant'];
-                $datePriseFonction = $_POST['date_prise_fonction'];
-                $departement = $_POST['departement'];
-                $indice = $_POST['indice'];
-                $this->utilisateurModel->addEnseignant($nom, $prenom, $tel, $email, $mot_de_passe, $datePriseFonction, $departement, $indice);
-                header("Location: dashboard.php");
-                exit();
+            // Gestion des formulaires POST
+            if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+                if (isset($_POST['ajouter_matiere'])) {
+                    $nom_matiere = $_POST['nom_matiere'];
+                    $description = $_POST['description'];
+                    $this->matiereModel->addMatiere($nom_matiere, $description);
+                    header("Location: dashboard.php");
+                    exit();
+                }
+                elseif (isset($_POST['supprimer_matiere'])) {
+                    $matiere_id = $_POST['matiere_id'];
+                    $this->matiereModel->deleteMatiere($matiere_id);
+                    header("Location: dashboard.php");
+                    exit();
+                }
+                elseif (isset($_POST['ajouter_etudiant'])) {
+                    $nom = $_POST['nom_etudiant'];
+                    $prenom = $_POST['prenom_etudiant'];
+                    $tel = $_POST['tel_etudiant'];
+                    $email = $_POST['email_etudiant'];
+                    $mot_de_passe = $_POST['mot_de_passe_etudiant'];
+                    $anneeEntree = $_POST['annee_entree'];
+                    $this->utilisateurModel->addEtudiant($nom, $prenom, $tel, $email, $mot_de_passe, $anneeEntree);
+                    header("Location: dashboard.php");
+                    exit();
+                }
+                elseif (isset($_POST['supprimer_etudiant'])) {
+                    $etudiant_id = $_POST['etudiant_id'];
+                    $this->supprimerEtudiant($etudiant_id);
+                    header("Location: dashboard.php");
+                    exit();
+                }
+                elseif (isset($_POST['ajouter_enseignant'])) {
+                    $nom = $_POST['nom_enseignant'];
+                    $prenom = $_POST['prenom_enseignant'];
+                    $tel = $_POST['tel_enseignant'];
+                    $email = $_POST['email_enseignant'];
+                    $mot_de_passe = $_POST['mot_de_passe_enseignant'];
+                    $datePriseFonction = $_POST['date_prise_fonction'];
+                    $departement = $_POST['departement'];
+                    $indice = $_POST['indice'];
+                    $this->utilisateurModel->addEnseignant($nom, $prenom, $tel, $email, $mot_de_passe, $datePriseFonction, $departement, $indice);
+                    header("Location: dashboard.php");
+                    exit();
+                }
+                elseif (isset($_POST['supprimer_enseignant'])) {
+                    $enseignant_id = $_POST['enseignant_id'];
+                    $this->supprimerEnseignant($enseignant_id);
+                    header("Location: dashboard.php");
+                    exit();
+                }
+                elseif (isset($_POST['attribuer_enseignant'])) {
+                    $matiere_id = $_POST['matiere_id'];
+                    $enseignant_id = $_POST['enseignant_id'];
+                    $this->matiereModel->attribuerEnseignant($matiere_id, $enseignant_id);
+                    header("Location: dashboard.php");
+                    exit();
+                }
             }
 
             require 'views/dashboard/admin.php';
         }
         $content = ob_get_clean();
-        $role = $_SESSION['role'];
         require 'views/layouts/main.php';
+    }
+
+    // Ajouter ces nouvelles méthodes à la classe
+    private function getEtudiants() {
+        $stmt = $this->pdo->prepare("
+            SELECT u.id, u.nom, u.prenom, u.email, u.tel as telephone, e.annee_entree 
+            FROM Utilisateur u 
+            JOIN Etudiant e ON u.id = e.id
+        ");
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    private function getEnseignants() {
+        $stmt = $this->pdo->prepare("
+            SELECT u.id, u.nom, u.prenom, u.email, u.tel as telephone, 
+                   e.departement, e.date_prise_fonction, e.indice 
+            FROM Utilisateur u 
+            JOIN Enseignant e ON u.id = e.id
+        ");
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    private function supprimerEtudiant($id) {
+        $stmt = $this->pdo->prepare("DELETE FROM Etudiant WHERE id = ?");
+        $stmt->execute([$id]);
+        $stmt = $this->pdo->prepare("DELETE FROM Utilisateur WHERE id = ?");
+        $stmt->execute([$id]);
+    }
+
+    private function supprimerEnseignant($id) {
+        $stmt = $this->pdo->prepare("DELETE FROM Enseignant WHERE id = ?");
+        $stmt->execute([$id]);
+        $stmt = $this->pdo->prepare("DELETE FROM Utilisateur WHERE id = ?");
+        $stmt->execute([$id]);
     }
 }
 ?>
