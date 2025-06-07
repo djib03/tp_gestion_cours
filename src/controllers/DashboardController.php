@@ -28,18 +28,20 @@ class DashboardController {
 
         $user_id = $_SESSION['user_id'];
         $role = $_SESSION['role'];
-
-        ob_start();
         $data = []; // Initialisation par défaut
 
         if ($role == 'etudiant') {
             $search_matiere = isset($_POST['search_matiere']) ? $_POST['search_matiere'] : '';
             
             error_log("Recherche des notes pour l'étudiant ID: $user_id");
-            $notes = $this->noteModel->getAllNotesByEtudiant($user_id);
+            
+            // Récupération des notes
             if ($search_matiere) {
                 $notes = $this->noteModel->getNotesByMatiere($user_id, $search_matiere);
+            } else {
+                $notes = $this->noteModel->getAllNotesByEtudiant($user_id);
             }
+            
             $moyenne_generale = $this->noteModel->getMoyenneGenerale($user_id);
             $moyennes_par_matiere = $this->noteModel->getMoyennesParMatiere($user_id);
 
@@ -51,10 +53,13 @@ class DashboardController {
             ];
 
             error_log("Nombre de notes: " . count($notes));
-            var_dump($data); // Débogage
+            error_log("Data: " . print_r($data, true));
 
-            $content = ob_get_clean();
+            // Capture du contenu de la vue étudiant
+            ob_start();
             require 'views/dashboard/etudiant.php';
+            $content = ob_get_clean();
+            
         } elseif ($role == 'enseignant') {
             if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['saisir_note'])) {
                 $etudiant_id = $_POST['etudiant_id'] ?? null;
@@ -76,8 +81,12 @@ class DashboardController {
 
             $data['matieres'] = $this->getMatieresByEnseignant($user_id);
             $data['etudiants'] = $this->getEtudiants();
-            $content = ob_get_clean();
+            
+            // Capture du contenu de la vue enseignant
+            ob_start();
             require 'views/dashboard/enseignant.php';
+            $content = ob_get_clean();
+            
         } elseif ($role == 'admin') {
             $matieres = $this->matiereModel->getAllMatieres();
             $etudiants = $this->getEtudiants();
@@ -141,11 +150,14 @@ class DashboardController {
                 'etudiants' => $etudiants,
                 'enseignants' => $enseignants
             ];
-            $content = ob_get_clean();
+            
+            // Capture du contenu de la vue admin
+            ob_start();
             require 'views/dashboard/admin.php';
+            $content = ob_get_clean();
         }
 
-        $role = $_SESSION['role'];
+        // Affichage du layout principal avec le contenu
         require 'views/layouts/main.php';
     }
 
