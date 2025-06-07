@@ -31,15 +31,17 @@ class DashboardController {
         $data = []; // Initialisation par défaut
 
         if ($role == 'etudiant') {
-            $search_matiere = isset($_POST['search_matiere']) ? $_POST['search_matiere'] : '';
+            // Vérifier si une recherche a été effectuée
+            $search_matiere = isset($_POST['search_matiere']) ? trim($_POST['search_matiere']) : '';
             
             error_log("Recherche des notes pour l'étudiant ID: $user_id");
             
-            // Récupération des notes
-            if ($search_matiere) {
+            // Récupération des notes - TOUJOURS récupérer toutes les notes d'abord
+            $notes = $this->noteModel->getAllNotesByEtudiant($user_id);
+            
+            // Si une recherche spécifique est faite, filtrer les résultats
+            if (!empty($search_matiere)) {
                 $notes = $this->noteModel->getNotesByMatiere($user_id, $search_matiere);
-            } else {
-                $notes = $this->noteModel->getAllNotesByEtudiant($user_id);
             }
             
             $moyenne_generale = $this->noteModel->getMoyenneGenerale($user_id);
@@ -49,10 +51,12 @@ class DashboardController {
                 'notes' => $notes,
                 'moyenne_generale' => $moyenne_generale,
                 'moyennes_par_matiere' => $moyennes_par_matiere,
-                'search_matiere' => $search_matiere
+                'search_matiere' => $search_matiere,
+                'is_search_active' => !empty($search_matiere) // Indicateur de recherche active
             ];
 
             error_log("Nombre de notes: " . count($notes));
+            error_log("Recherche active: " . ($search_matiere ? 'Oui' : 'Non'));
             error_log("Data: " . print_r($data, true));
 
             // Capture du contenu de la vue étudiant

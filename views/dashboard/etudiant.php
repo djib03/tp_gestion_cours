@@ -10,11 +10,25 @@ error_log("Vue étudiant - Data reçue: " . print_r($data, true));
     padding: 20px;
 }
 
+.dashboard-title {
+    text-align: center;
+    color: #007cba;
+}
+
+.section-matieres, .section-notes {
+    margin-bottom: 30px;
+}
+
+.section-title {
+    font-size: 1.5em;
+    margin-bottom: 15px;
+    color: #333;
+}
+
 .search-form {
     background: #f5f5f5;
     padding: 15px;
     border-radius: 5px;
-    margin-bottom: 20px;
 }
 
 .search-form label {
@@ -29,63 +43,63 @@ error_log("Vue étudiant - Data reçue: " . print_r($data, true));
     border-radius: 3px;
 }
 
+.search-form select {
+    width: 300px;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
 .search-form button {
     padding: 8px 15px;
     background: #007cba;
     color: white;
     border: none;
-    border-radius: 3px;
-    cursor: pointer;
 }
 
-.suggestions {
-    position: relative;
-    background: white;
-    border: 1px solid #ddd;
-    max-height: 200px;
-    overflow-y: auto;
-    display: none;
-}
-
-.suggestions div {
-    padding: 10px;
-    cursor: pointer;
-}
-
-.suggestions div:hover {
-    background: #f0f0f0;
-}
-
-.notes-list, .moyennes-list {
+.matieres-list {
     list-style: none;
     padding: 0;
 }
 
-.note-item, .moyenne-item {
+.matiere-item {
     background: #f9f9f9;
     padding: 10px;
     margin: 5px 0;
     border-left: 4px solid #007cba;
 }
 
-.moyenne-generale {
+.note-value {
+    float: right;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.stats-container {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+
+.stat-card {
     background: #e8f4f8;
     padding: 15px;
     border-radius: 5px;
-    margin: 20px 0;
     text-align: center;
+    flex: 1;
+    margin: 0 10px;
 }
 
-.moyenne-generale h4 {
-    margin-top: 0;
-    color: #007cba;
-}
-
-.moyenne-generale p {
-    font-size: 1.5em;
+.stat-number {
+    font-size: 2em;
     font-weight: bold;
-    color: #333;
+    color: #007cba;
     margin: 0;
+}
+
+.stat-label {
+    color: #666;
+    font-size: 0.9em;
 }
 
 .no-data {
@@ -94,80 +108,130 @@ error_log("Vue étudiant - Data reçue: " . print_r($data, true));
     text-align: center;
     padding: 20px;
 }
+
+.btn-submit {
+    padding: 8px 15px;
+    background: #007cba;
+    color: white;
+    border: none;
+    text-decoration: none;
+    border-radius: 3px;
+}
+
+.btn-logout {
+    display: block;
+    text-align: center;
+    padding: 10px;
+    background: #d9534f;
+    color: white;
+    text-decoration: none;
+    border-radius: 3px;
+    margin-top: 20px;
+}
+
+.btn-logout:hover {
+    background: #c9302c;
+}
 </style>
 
 <div class="dashboard-container">
-    <h3>Vos Notes</h3>
+    <h3 class="dashboard-title">Tableau de Bord Étudiant</h3>
 
-    <!-- Formulaire de recherche avec autocomplétion -->
-    <form method="POST" action="" class="search-form">
-        <label>
-            Rechercher une matière : 
-            <input type="text" name="search_matiere" 
-                   value="<?php echo htmlspecialchars($data['search_matiere'] ?? ''); ?>" 
-                   id="search-matiere" autocomplete="off">
-        </label>
-        <button type="submit">Rechercher</button>
-        <div id="suggestions" class="suggestions"></div>
-    </form>
-
-    <!-- Debug : Afficher le contenu de $data -->
-    <?php if (isset($_GET['debug'])): ?>
-        <div style="background: #ffffcc; padding: 10px; margin: 10px 0; border: 1px solid #ccc;">
-            <strong>Debug - Données :</strong>
-            <pre><?php print_r($data); ?></pre>
-        </div>
-    <?php endif; ?>
-
-    <!-- Liste des notes -->
-    <h4>Liste des Notes</h4>
-    <?php if (isset($data['notes']) && is_array($data['notes']) && count($data['notes']) > 0): ?>
-        <ul class="notes-list">
-        <?php foreach ($data['notes'] as $note): ?>
-            <li class="note-item">
-                <?php 
-                echo htmlspecialchars($note['nom_matiere'] ?? 'Matière inconnue') . " : " . 
-                     htmlspecialchars($note['valeur'] ?? '0') . " / 20"; 
-                ?>
-            </li>
-        <?php endforeach; ?>
-        </ul>
-    <?php else: ?>
-        <p class="no-data">
-            <?php if (isset($data['search_matiere']) && !empty($data['search_matiere'])): ?>
-                Aucune note trouvée pour "<?php echo htmlspecialchars($data['search_matiere']); ?>".
-            <?php else: ?>
-                Aucune note enregistrée.
+    <!-- Formulaire de recherche avec liste déroulante -->
+    <div class="section-matieres">
+        <h4 class="section-title">Filtrer par Matière</h4>
+        <form method="POST" action="" class="search-form">
+            <div class="form-group">
+                <label for="search-matiere">Sélectionner une matière :</label>
+                <select name="search_matiere" id="search-matiere">
+                    <option value="">Toutes les matières</option>
+                    <?php if (isset($data['matieres']) && is_array($data['matieres'])): ?>
+                        <?php foreach ($data['matieres'] as $matiere): ?>
+                            <option value="<?php echo htmlspecialchars($matiere['nom']); ?>" 
+                                    <?php echo (isset($data['search_matiere']) && $data['search_matiere'] === $matiere['nom']) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($matiere['nom']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </select>
+            </div>
+            <button type="submit" class="btn-submit">Filtrer</button>
+            <?php if (!empty($data['search_matiere'])): ?>
+                <a href="dashboard.php" class="btn-submit">Afficher toutes les notes</a>
             <?php endif; ?>
-        </p>
-    <?php endif; ?>
-
-    <!-- Moyenne générale -->
-    <div class="moyenne-generale">
-        <h4>Moyenne Générale</h4>
-        <p><?php echo isset($data['moyenne_generale']) ? number_format($data['moyenne_generale'], 2) : '0.00'; ?> / 20</p>
+        </form>
     </div>
 
-    <!-- Moyennes par matière -->
-    <div class="moyennes-matiere">
-        <h4>Moyennes par Matière</h4>
+    <!-- Section des Notes -->
+    <div class="section-notes">
+        <h4 class="section-title">
+            <?php if (!empty($data['search_matiere'])): ?>
+                Notes pour "<?php echo htmlspecialchars($data['search_matiere']); ?>"
+            <?php else: ?>
+                Toutes vos Notes
+            <?php endif; ?>
+        </h4>
+
+        <?php if (isset($data['notes']) && is_array($data['notes']) && count($data['notes']) > 0): ?>
+            <ul class="matieres-list">
+                <?php foreach ($data['notes'] as $note): ?>
+                    <li class="matiere-item">
+                        <strong><?php echo htmlspecialchars($note['nom_matiere'] ?? 'Matière inconnue'); ?></strong>
+                        <span class="note-value">
+                            <?php echo htmlspecialchars($note['valeur'] ?? '0'); ?> / 20
+                        </span>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php else: ?>
+            <p class="no-data">
+                <?php if (!empty($data['search_matiere'])): ?>
+                    Aucune note trouvée pour "<?php echo htmlspecialchars($data['search_matiere']); ?>".
+                    <br><a href="dashboard.php" class="btn-submit">Voir toutes vos notes</a>
+                <?php else: ?>
+                    Aucune note n'a encore été enregistrée pour vous.
+                <?php endif; ?>
+            </p>
+        <?php endif; ?>
+
+        <!-- Stats Container -->
+        <div class="stats-container">
+            <!-- Moyenne Générale -->
+            <div class="stat-card">
+                <div class="stat-number">
+                    <?php echo isset($data['moyenne_generale']) ? number_format($data['moyenne_generale'], 2) : '0.00'; ?>
+                </div>
+                <div class="stat-label">Moyenne Générale</div>
+            </div>
+
+            <!-- Nombre de Notes -->
+            <div class="stat-card">
+                <div class="stat-number">
+                    <?php echo isset($data['notes']) ? count($data['notes']) : '0'; ?>
+                </div>
+                <div class="stat-label">Notes Totales</div>
+            </div>
+        </div>
+
+        <!-- Moyennes par matière -->
+        <h4 class="section-title">Moyennes par Matière</h4>
         <?php if (isset($data['moyennes_par_matiere']) && is_array($data['moyennes_par_matiere']) && !empty($data['moyennes_par_matiere'])): ?>
-            <ul class="moyennes-list">
-            <?php foreach ($data['moyennes_par_matiere'] as $moyenne): ?>
-                <li class="moyenne-item">
-                    <?php echo htmlspecialchars($moyenne['nom'] ?? 'Matière inconnue') . " : " . 
-                              number_format($moyenne['moyenne'] ?? 0, 2) . " / 20"; ?>
-                </li>
-            <?php endforeach; ?>
+            <ul class="matieres-list">
+                <?php foreach ($data['moyennes_par_matiere'] as $moyenne): ?>
+                    <li class="matiere-item">
+                        <strong><?php echo htmlspecialchars($moyenne['nom'] ?? 'Matière inconnue'); ?></strong>
+                        <span class="note-value">
+                            <?php echo number_format($moyenne['moyenne'] ?? 0, 2); ?> / 20
+                        </span>
+                    </li>
+                <?php endforeach; ?>
             </ul>
         <?php else: ?>
             <p class="no-data">Aucune moyenne calculée.</p>
         <?php endif; ?>
     </div>
 
-    <p style="text-align: center; margin-top: 30px;">
-        <a href="/tp_gestion_cours/logout.php" style="color: #007cba; text-decoration: none;">→ Déconnexion</a>
-    </p>
+    <a href="/tp_gestion_cours/logout.php" class="btn-logout">Déconnexion</a>
 </div>
 
 <script>
