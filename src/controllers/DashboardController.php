@@ -1,63 +1,88 @@
 <?php
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 require_once '/wamp64/www/tp_gestion_cours/src/models/Matiere.php';
 require_once '/wamp64/www/tp_gestion_cours/src/models/Utilisateur.php';
+require_once '/wamp64/www/tp_gestion_cours/src/models/Note.php';
 
 class DashboardController {
     private $pdo;
     private $matiereModel;
     private $utilisateurModel;
+    private $noteModel;
 
     public function __construct($pdo) {
         $this->pdo = $pdo;
         $this->matiereModel = new Matiere($pdo);
         $this->utilisateurModel = new Utilisateur($pdo);
+        $this->noteModel = new Note($pdo);
     }
 
     public function index() {
         session_start();
         if (!isset($_SESSION['user_id'])) {
-            header("Location: index.php");
+            header('Location: /tp_gestion_cours/login.php');
             exit();
         }
+
         $user_id = $_SESSION['user_id'];
         $role = $_SESSION['role'];
 
         ob_start();
+        $data = []; // Initialisation par défaut
+
         if ($role == 'etudiant') {
-            $stmt = $this->pdo->prepare("SELECT m.nom, n.valeur FROM Note n JOIN Matiere m ON n.matiere_id = m.id WHERE n.etudiant_id = ?");
-            $stmt->execute([$user_id]);
-            $notes = $stmt->fetchAll();
+            $search_matiere = isset($_POST['search_matiere']) ? $_POST['search_matiere'] : '';
+            
+            error_log("Recherche des notes pour l'étudiant ID: $user_id");
+            $notes = $this->noteModel->getAllNotesByEtudiant($user_id);
+            if ($search_matiere) {
+                $notes = $this->noteModel->getNotesByMatiere($user_id, $search_matiere);
+            }
+            $moyenne_generale = $this->noteModel->getMoyenneGenerale($user_id);
+            $moyennes_par_matiere = $this->noteModel->getMoyennesParMatiere($user_id);
+
+            $data = [
+                'notes' => $notes,
+                'moyenne_generale' => $moyenne_generale,
+                'moyennes_par_matiere' => $moyennes_par_matiere,
+                'search_matiere' => $search_matiere
+            ];
+
+            error_log("Nombre de notes: " . count($notes));
+            var_dump($data); // Débogage
+
+            $content = ob_get_clean();
             require 'views/dashboard/etudiant.php';
         } elseif ($role == 'enseignant') {
-            if (isset($_POST['saisir_note'])) {
-                $etudiant_id = $_POST['etudiant_id'];
-                $matiere_id = $_POST['matiere_id'];
-                $valeur = $_POST['valeur'];
-                if ($this->saisirNote($etudiant_id, $matiere_id, $valeur)) {
-                    $_SESSION['message'] = "Note enregistrée avec succès";
+            if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['saisir_note'])) {
+                $etudiant_id = $_POST['etudiant_id'] ?? null;
+                $matiere_id = $_POST['matiere_id'] ?? null;
+                $valeur = $_POST['valeur'] ?? null;
+
+                if ($etudiant_id && $matiere_id && $valeur !== null) {
+                    if ($this->noteModel->saisirNote($etudiant_id, $matiere_id, $valeur)) {
+                        $_SESSION['message'] = "Note enregistrée avec succès";
+                    } else {
+                        $_SESSION['error'] = "Erreur lors de l'enregistrement de la note";
+                    }
                 } else {
-                    $_SESSION['error'] = "Erreur lors de l'enregistrement de la note";
+                    $_SESSION['error'] = "Tous les champs sont obligatoires";
                 }
+                header("Location: " . $_SERVER['PHP_SELF']);
+                exit();
             }
-            $stmt = $this->pdo->prepare("
-        SELECT m.* 
-        FROM Matiere m 
-        WHERE m.enseignant_id = ?
-    ");
-            $stmt->execute([$user_id]);
-            $data['matieres'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $data['matieres'] = $this->getMatieresByEnseignant($user_id);
+            $data['etudiants'] = $this->getEtudiants();
+            $content = ob_get_clean();
             require 'views/dashboard/enseignant.php';
         } elseif ($role == 'admin') {
-            // Récupérer les matières
             $matieres = $this->matiereModel->getAllMatieres();
-            
-            // Récupérer la liste des étudiants
             $etudiants = $this->getEtudiants();
-            
-            // Récupérer la liste des enseignants
             $enseignants = $this->getEnseignants();
 
-            // Gestion des formulaires POST
             if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 if (isset($_POST['ajouter_matiere'])) {
                     $nom_matiere = $_POST['nom_matiere'];
@@ -65,14 +90,12 @@ class DashboardController {
                     $this->matiereModel->addMatiere($nom_matiere, $description);
                     header("Location: dashboard.php");
                     exit();
-                }
-                elseif (isset($_POST['supprimer_matiere'])) {
+                } elseif (isset($_POST['supprimer_matiere'])) {
                     $matiere_id = $_POST['matiere_id'];
                     $this->matiereModel->deleteMatiere($matiere_id);
                     header("Location: dashboard.php");
                     exit();
-                }
-                elseif (isset($_POST['ajouter_etudiant'])) {
+                } elseif (isset($_POST['ajouter_etudiant'])) {
                     $nom = $_POST['nom_etudiant'];
                     $prenom = $_POST['prenom_etudiant'];
                     $tel = $_POST['tel_etudiant'];
@@ -82,14 +105,12 @@ class DashboardController {
                     $this->utilisateurModel->addEtudiant($nom, $prenom, $tel, $email, $mot_de_passe, $anneeEntree);
                     header("Location: dashboard.php");
                     exit();
-                }
-                elseif (isset($_POST['supprimer_etudiant'])) {
+                } elseif (isset($_POST['supprimer_etudiant'])) {
                     $etudiant_id = $_POST['etudiant_id'];
                     $this->supprimerEtudiant($etudiant_id);
                     header("Location: dashboard.php");
                     exit();
-                }
-                elseif (isset($_POST['ajouter_enseignant'])) {
+                } elseif (isset($_POST['ajouter_enseignant'])) {
                     $nom = $_POST['nom_enseignant'];
                     $prenom = $_POST['prenom_enseignant'];
                     $tel = $_POST['tel_enseignant'];
@@ -101,14 +122,12 @@ class DashboardController {
                     $this->utilisateurModel->addEnseignant($nom, $prenom, $tel, $email, $mot_de_passe, $datePriseFonction, $departement, $indice);
                     header("Location: dashboard.php");
                     exit();
-                }
-                elseif (isset($_POST['supprimer_enseignant'])) {
+                } elseif (isset($_POST['supprimer_enseignant'])) {
                     $enseignant_id = $_POST['enseignant_id'];
                     $this->supprimerEnseignant($enseignant_id);
                     header("Location: dashboard.php");
                     exit();
-                }
-                elseif (isset($_POST['attribuer_enseignant'])) {
+                } elseif (isset($_POST['attribuer_enseignant'])) {
                     $matiere_id = $_POST['matiere_id'];
                     $enseignant_id = $_POST['enseignant_id'];
                     $this->matiereModel->attribuerEnseignant($matiere_id, $enseignant_id);
@@ -117,13 +136,19 @@ class DashboardController {
                 }
             }
 
+            $data = [
+                'matieres' => $matieres,
+                'etudiants' => $etudiants,
+                'enseignants' => $enseignants
+            ];
+            $content = ob_get_clean();
             require 'views/dashboard/admin.php';
         }
-        $content = ob_get_clean();
+
+        $role = $_SESSION['role'];
         require 'views/layouts/main.php';
     }
 
-    // Ajouter ces nouvelles méthodes à la classe
     private function getEtudiants() {
         $stmt = $this->pdo->prepare("
             SELECT u.id, u.nom, u.prenom, u.email, u.tel as telephone, e.annee_entree 
@@ -159,13 +184,13 @@ class DashboardController {
         $stmt->execute([$id]);
     }
 
-    // Ajouter cette méthode dans la classe DashboardController
-    private function saisirNote($etudiant_id, $matiere_id, $valeur) {
+    private function getMatieresByEnseignant($enseignant_id) {
         $stmt = $this->pdo->prepare("
-            INSERT INTO Note (etudiant_id, matiere_id, valeur) 
-            VALUES (?, ?, ?)
+            SELECT * FROM Matiere 
+            WHERE enseignant_id = :enseignant_id
         ");
-        return $stmt->execute([$etudiant_id, $matiere_id, $valeur]);
+        $stmt->execute([':enseignant_id' => $enseignant_id]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
 ?>

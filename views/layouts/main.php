@@ -1,5 +1,5 @@
 <?php require '/wamp64/www/tp_gestion_cours/includes/header.php'; ?>
-<h2>Bienvenue, <?php echo $role; ?></h2>
+<h2>Bienvenue, <?php echo htmlspecialchars($role); ?></h2>
 <?php
 if (isset($data)) {
     extract($data);
