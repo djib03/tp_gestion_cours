@@ -29,7 +29,7 @@ class Matiere {
     }
 
     public function attribuerEnseignant($matiere_id, $enseignant_id) {
-        $stmt = $this->pdo->prepare("UPDATE Matiere SET id_enseignant = ? WHERE id = ?");
+        $stmt = $this->pdo->prepare("UPDATE Matiere SET enseignant_id = ? WHERE id = ?");
         return $stmt->execute([$enseignant_id, $matiere_id]);
     }
 }

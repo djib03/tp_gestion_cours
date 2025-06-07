@@ -29,9 +29,23 @@ class DashboardController {
             $notes = $stmt->fetchAll();
             require 'views/dashboard/etudiant.php';
         } elseif ($role == 'enseignant') {
-            $stmt = $this->pdo->prepare("SELECT m.nom, m.description FROM Enseigne e JOIN Matiere m ON e.matiere_id = m.id WHERE e.enseignant_id = ?");
+            if (isset($_POST['saisir_note'])) {
+                $etudiant_id = $_POST['etudiant_id'];
+                $matiere_id = $_POST['matiere_id'];
+                $valeur = $_POST['valeur'];
+                if ($this->saisirNote($etudiant_id, $matiere_id, $valeur)) {
+                    $_SESSION['message'] = "Note enregistrée avec succès";
+                } else {
+                    $_SESSION['error'] = "Erreur lors de l'enregistrement de la note";
+                }
+            }
+            $stmt = $this->pdo->prepare("
+        SELECT m.* 
+        FROM Matiere m 
+        WHERE m.enseignant_id = ?
+    ");
             $stmt->execute([$user_id]);
-            $matieres = $stmt->fetchAll();
+            $data['matieres'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
             require 'views/dashboard/enseignant.php';
         } elseif ($role == 'admin') {
             // Récupérer les matières
@@ -143,6 +157,15 @@ class DashboardController {
         $stmt->execute([$id]);
         $stmt = $this->pdo->prepare("DELETE FROM Utilisateur WHERE id = ?");
         $stmt->execute([$id]);
+    }
+
+    // Ajouter cette méthode dans la classe DashboardController
+    private function saisirNote($etudiant_id, $matiere_id, $valeur) {
+        $stmt = $this->pdo->prepare("
+            INSERT INTO Note (etudiant_id, matiere_id, valeur) 
+            VALUES (?, ?, ?)
+        ");
+        return $stmt->execute([$etudiant_id, $matiere_id, $valeur]);
     }
 }
 ?>
